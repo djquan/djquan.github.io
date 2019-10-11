@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Dan Quan</title>
+    <link>https://quan.io/</link>
+    <description>Recent content on Dan Quan</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Fri, 06 Sep 2019 18:43:51 -0700</lastBuildDate>
+    
+	<atom:link href="https://quan.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Deploying Phoenix to Kubernetes from Scratch</title>
+      <link>https://quan.io/blog/deploying-phoenix-to-kubernetes-from-scratch/</link>
+      <pubDate>Fri, 06 Sep 2019 18:43:51 -0700</pubDate>
+      
+      <guid>https://quan.io/blog/deploying-phoenix-to-kubernetes-from-scratch/</guid>
+      <description>Introduction Kubernetes is such an exciting technology, but it can be overwhelming when starting. There are many reasons to use Kubernetes, and likely an equal number of valid reasons to use something different. I don&amp;rsquo;t have anything interesting or new to add to that debate though. I use Kubernetes at work and for personal projects, and I love the options it gives me for deploying applications. There&amp;rsquo;s an initial burden when getting the cluster set up and learning the basics, but deploying applications is easy and quick after.</description>
+    </item>
+    
+    <item>
+      <title>Using Erlang&#39;s Observer in Kubernetes for an Elixir Release</title>
+      <link>https://quan.io/blog/using-erlangs-observer-in-kubernetes-for-an-elixir-release/</link>
+      <pubDate>Mon, 02 Sep 2019 15:25:13 -0700</pubDate>
+      
+      <guid>https://quan.io/blog/using-erlangs-observer-in-kubernetes-for-an-elixir-release/</guid>
+      <description>Erlang&amp;rsquo;s observer is awesome. There are a lot of anecdotes on the usefulness of it for debugging production systems, and one of my favorites is how the Phoenix team used it to find a process that was filling up it&amp;rsquo;s mailbox.
+Most of the guides out there are for using it with vanilla ssh.
+We&amp;rsquo;ll work through getting a local Observer talking with a Kubernetes pod in production.
+Pre-requisites  A Phoenix App using Elixir 1.</description>
+    </item>
+    
+    <item>
+      <title>About</title>
+      <link>https://quan.io/about/</link>
+      <pubDate>Sat, 31 Aug 2019 15:38:10 -0600</pubDate>
+      
+      <guid>https://quan.io/about/</guid>
+      <description>Experience I&amp;rsquo;ve been a software developer at Braintree Payments since 2014 working primarily in Ruby and Java.
+For more of my portfolio, check out my github.
+Conference Talks Pairing and Policing - A talk given at Rocky Mountain Ruby about how my experiences as a cop prepared me for being good at pair programming.
+Side Projects budget.sh - This is my current, work in progress side project. It&amp;rsquo;s an open source budgeting application.</description>
+    </item>
+    
+    <item>
+      <title>Home</title>
+      <link>https://quan.io/home/</link>
+      <pubDate>Sat, 31 Aug 2019 15:18:16 -0600</pubDate>
+      
+      <guid>https://quan.io/home/</guid>
+      <description>Software Engineer &amp;amp; Photographer
+San Diego, CA</description>
+    </item>
+    
+  </channel>
+</rss>
