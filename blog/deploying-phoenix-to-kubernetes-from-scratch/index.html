@@ -317,8 +317,6 @@ div.main .content .title-container {
 div.main .content .posts {
   
   
-  
-  
 }
 div.main .content .page-heading {
   font-size: 20px;
@@ -1159,321 +1157,235 @@ div.main .content .markdown pre, div.main .content .markdown pre code {
             <div class="markdown">
                 
     
-    
-
-<h2 id="introduction">Introduction</h2>
-
+    <h2 id="introduction">Introduction</h2>
 <p>Kubernetes is such an exciting technology, but it can be overwhelming when starting. There are many reasons to use Kubernetes, and likely an equal number of valid reasons to use something different. I don&rsquo;t have anything interesting or new to add to that debate though. I use Kubernetes <a href="https://braintreepayments.com/careers">at work</a> and for personal projects, and I love the options it gives me for deploying applications. There&rsquo;s an initial burden when getting the cluster set up and learning the basics, but deploying applications is easy and quick after.</p>
-
 <p>I highly recommend <a href="https://gigalixir.com">Gigalixir</a> if Kubernetes does not excite you, and all you want is a simple and reliable way to deploy a Phoenix application.</p>
-
 <p>This post is meant to be a complete guide for deploying a brand new Phoenix application to a brand new Kubernetes cluster. There are no pre-requisites to this, but I will call out places where you can substitute your existing solutions. I am not a Kubernetes or Elixir/Phoenix expert, so there are likely better ways of doing things. If you see such things, please leave a comment or <a href="https://github.com/djquan/quan.io/issues/new">open an issue</a>.</p>
-
 <p>The code I used in this guide lives <a href="https://github.com/djquan/kubernetes-phoenix">in github</a>, and can be used as a reference.</p>
-
 <h2 id="a-note-about-costs">A Note About Costs</h2>
-
 <p>You should be able to complete this tutorial for free: Digital Ocean and Google Cloud (and AWS, and Azure, and more) provide trial credits which should get you up and running. <a href="https://m.do.co/c/bac4b0edfb0a">This is my digital ocean referral link</a> that should get you $50 in credits, which should be plenty for this tutorial. I believe Google Cloud also offers $300 for new accounts. This tutorial, however, will only be using Digital Ocean products. There are some ways to cut costs when running a Kubernetes cluster, which I will also try to call out.</p>
-
 <p>There are completely free ways of playing around with Kubernetes locally, but it&rsquo;s been my experience that it&rsquo;s easier to learn on real Kubernetes clusters. If you have more than one old spare computer, building a Kubernetes cluster from those is enriching and fun, but using a managed Kubernetes solution lets you focus on deploying applications.</p>
-
 <h2 id="the-kubernetes-cluster">The Kubernetes Cluster</h2>
-
 <p>Digital Ocean provides a fantastic Kubernetes product. It lacks some of Google&rsquo;s bells and whistles, but it&rsquo;s cheaper and works really well. As mentioned above, you can use <a href="https://m.do.co/c/bac4b0edfb0a">my referral link</a> to get free credits. If you have a Kubernetes cluster already, you can skip to the next section.</p>
-
 <p>Once you create a new account, navigate to the <a href="https://cloud.digitalocean.com/kubernetes/clusters/new">Kubernetes cluster creation page</a>. Create a new cluster</p>
-
 <ul>
 <li>using the latest Kubernetes version</li>
 <li>in the region closest to you</li>
 <li>with 3 $10/month nodes. Digital Ocean does let you create a two node cluster, so this is an area to save money if high availability is not your primary concern.</li>
 </ul>
-
 <p>I&rsquo;ve named my cluster <code>test-phoenix-cluster</code>.</p>
-
 <p>It&rsquo;ll take a few minutes to start up your new Kubernetes cluster, so take this time to follow the <a href="https://www.digitalocean.com/docs/kubernetes/how-to/connect-to-cluster/">instructions on connecting to a Digital Ocean cluster</a>. This requires setting up <a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">Kubectl</a> and <a href="https://github.com/digitalocean/doctl#installing-doctl">doctl</a>. Setting up <a href="https://github.com/ahmetb/kubectx">Kubectx and Kubens</a> is also recommended (but not strictly necessary).</p>
-
 <p>After your cluster is ready, run: <code>doctl kubernetes cluster kubeconfig save test-phoenix-cluster</code> to set up your config and authentication.</p>
-
 <p>When you are finished, you should be able to run the following and get similar results:</p>
-
-<pre><code class="language-bash">$ kubectl get nodes
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get nodes
 NAME                STATUS   ROLES    AGE    VERSION
 phoenix-pool-bqk5   Ready    &lt;none&gt;   113s   v1.15.3
 phoenix-pool-bqkp   Ready    &lt;none&gt;   74s    v1.15.3
 phoenix-pool-bqks   Ready    &lt;none&gt;   80s    v1.15.3
-</code></pre>
-
-<h2 id="nginx-ingress-with-let-s-encrypt">Nginx Ingress with Let&rsquo;s Encrypt</h2>
-
+</code></pre></div><h2 id="nginx-ingress-with-lets-encrypt">Nginx Ingress with Let&rsquo;s Encrypt</h2>
 <p>Web Applications need to be accessible from outside of your cluster, and should be only accessible via HTTPS. We are going to accomplish this using <a href="https://github.com/kubernetes/ingress-nginx">NGINX Ingress</a> and <a href="https://github.com/jetstack/cert-manager">Cert-Manager</a>. <a href="https://www.digitalocean.com/community/tutorials/how-to-set-up-an-nginx-ingress-with-cert-manager-on-digitalocean-kubernetes">This tutorial</a> was foundational in my understanding of how this worked.</p>
-
 <p>The basic idea of this section is to provide Kubernetes the ability to easily link your application&rsquo;s container with a load balancer, and automatically put a HTTPS reverse proxy in front of your application.</p>
-
 <p>First, let&rsquo;s get NGINX Ingress up and running.</p>
-
 <p>Run the following (taken from the <a href="https://kubernetes.github.io/ingress-nginx/deploy/">nginx ingress docs</a>):</p>
-
-<pre><code class="language-bash">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.25.1/deploy/static/mandatory.yaml
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.25.1/deploy/static/mandatory.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.25.1/deploy/static/provider/cloud-generic.yaml
-</code></pre>
-
-<p>The above commands request creation of a load balancer. In a few minutes, the load balancer should be created, and you should get something similar:</p>
-
-<pre><code class="language-bash">$ kubectl get svc --namespace=ingress-nginx
-NAME            TYPE           CLUSTER-IP     EXTERNAL-IP       PORT(S)                      AGE
+</code></pre></div><p>The above commands request creation of a load balancer. In a few minutes, the load balancer should be created, and you should get something similar:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get svc --namespace<span style="color:#f92672">=</span>ingress-nginx
+NAME            TYPE           CLUSTER-IP     EXTERNAL-IP       PORT<span style="color:#f92672">(</span>S<span style="color:#f92672">)</span>                      AGE
 ingress-nginx   LoadBalancer   10.245.83.98   178.128.128.176   80:31168/TCP,443:31958/TCP   2m41s
-</code></pre>
-
-<p>Make note of the EXTERNAL-IP. We will reference that shortly.</p>
-
+</code></pre></div><p>Make note of the EXTERNAL-IP. We will reference that shortly.</p>
 <p>It&rsquo;s time to install cert-manager. Run the following (taken from <a href="https://docs.cert-manager.io/en/latest/getting-started/install/kubernetes.html">the cert manager docs</a>):</p>
-
-<pre><code class="language-bash">kubectl create namespace cert-manager
-kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl create namespace cert-manager
+kubectl label namespace cert-manager certmanager.k8s.io/disable-validation<span style="color:#f92672">=</span>true
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.10.0/cert-manager.yaml
-</code></pre>
-
-<p>Next, create the following file named <code>prod_issuer.yaml</code>:</p>
-
-<pre><code class="language-yaml">apiVersion: certmanager.k8s.io/v1alpha1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: YOUR_EMAIL_HERE
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    http01: {}
-</code></pre>
-
-<p>only replacing <code>YOUR_EMAIL_HERE</code> with your email. This is a necessary config file for cert-manager that let&rsquo;s you add annotations to automatically request certs from let&rsquo;s encrypt.</p>
-
+</code></pre></div><p>Next, create the following file named <code>prod_issuer.yaml</code>:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml"><span style="color:#66d9ef">apiVersion</span>: certmanager.k8s.io/v1alpha1
+<span style="color:#66d9ef">kind</span>: ClusterIssuer
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: letsencrypt-prod
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">acme</span>:
+    <span style="color:#66d9ef">server</span>: https://acme-v02.api.letsencrypt.org/directory
+    <span style="color:#66d9ef">email</span>: YOUR_EMAIL_HERE
+    <span style="color:#66d9ef">privateKeySecretRef</span>:
+      <span style="color:#66d9ef">name</span>: letsencrypt-prod
+    <span style="color:#66d9ef">http01</span>: {}
+</code></pre></div><p>only replacing <code>YOUR_EMAIL_HERE</code> with your email. This is a necessary config file for cert-manager that let&rsquo;s you add annotations to automatically request certs from let&rsquo;s encrypt.</p>
 <p>Apply the file with <code>kubectl apply -f prod_issuer.yaml</code></p>
-
 <h2 id="dns">DNS</h2>
-
 <p>We need to point two things to domains you control: a private docker registry and your phoenix application. If you already have a domain you control, you should create two different A records pointing to your EXTERNAL-IP and skip to the next section.</p>
-
 <p>Create an account at <a href="https://freedns.afraid.org/subdomain">https://freedns.afraid.org</a>. This is free for what we want to do with it.</p>
-
 <p>When that is completed, create two <code>A</code> records at the <a href="https://freedns.afraid.org/subdomain/edit.php">subdomains</a> page.</p>
-
 <ul>
 <li>The type needs to be <code>A</code>.</li>
 <li>The subdomain can be whatever as long as you record it.</li>
 <li>The domain can be whatever as long as you record it.</li>
 <li>The destination should be the EXTERNAL-IP from above.</li>
 </ul>
-
 <p>In my case, the output of this page looks like:</p>
-
-<pre><code class="language-text">phoenix1234.mooo.com A 178.128.128.176
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">phoenix1234.mooo.com A 178.128.128.176
 registry1234.mooo.com A 178.128.128.176
-</code></pre>
-
-<p>It&rsquo;ll take some time to propagate.</p>
-
+</code></pre></div><p>It&rsquo;ll take some time to propagate.</p>
 <h2 id="private-docker-registry">Private Docker Registry</h2>
-
 <p>Kubernetes is a container management system, so we are going to need a place to keep our containers. There are many ways to approach this. <a href="https://gitlab.com">Gitlab</a> has a free container registry. <a href="https://hub.docker.com/">Dockerhub</a> offers a free private repository per account. <a href="https://github.com/features/package-registry">Github</a> has an invite only beta registry.</p>
-
 <p>If you can <code>docker push</code> to a registry, feel free to skip to the next section. There are some advantages to controlling your own private docker registry, like having your images live in the same data center as your cluster. Those advantages likely do not outweigh managing another piece of infrastructure if you have an existing solution.</p>
-
 <p>First, create a <a href="https://cloud.digitalocean.com/spaces/new">Digital Ocean Space</a>. This is equivalent to S3, and will be the backing storage for our private registry.</p>
-
 <ul>
 <li>Try putting it in the same region your cluster is in</li>
 <li>CDN is not necessary</li>
 <li>Restrict File Listing</li>
 <li>Pick any name for the unique name, just make note of it. Mine is <code>test-phoenix-kubernetes</code></li>
 </ul>
-
 <p>After that has been created, create a new <a href="https://cloud.digitalocean.com/account/api/">spaces api key</a>. The top generated string is your access key, the bottom one is the secret key. Run the following with those values:</p>
-
-<pre><code class="language-bash">echo -n YOUR_ACCESS_KEY &gt; access_key
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">echo -n YOUR_ACCESS_KEY &gt; access_key
 echo -n YOUR_SECRET_KEY &gt; secret_key
-</code></pre>
-
-<p>New lines in env vars and secrets have bitten me before, so, the <code>-n</code> is necessary.</p>
-
+</code></pre></div><p>New lines in env vars and secrets have bitten me before, so, the <code>-n</code> is necessary.</p>
 <ul>
 <li>Next, create a namespace for your registry with: <code>kubectl create namespace registry</code></li>
 <li>Next, create an authentication file: <code>htpasswd -cB htpasswd admin</code>, entering your password when the prompt tells you to. (Note, the <code>-B</code> is for bcrypt, and it&rsquo;s poorly documented that this is required for the Docker registry)</li>
 <li>Create a kubernetes secret for all authentication: <code>kubectl create secret --namespace registry generic auth --from-file=./htpasswd --from-file=./access_key --from-file=./secret_key</code></li>
 </ul>
-
 <p>Create a registry.yaml with the following values:</p>
-
-<pre><code class="language-yaml">apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  labels:
-    app: registry
-  name: registry
-  namespace: registry
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: registry
-    spec:
-      containers:
-      - name: registry
-        image: registry:2
-        resources:
-          requests:
-            memory: &quot;512Mi&quot;
-            cpu: &quot;300m&quot;
-          limits:
-            memory: &quot;550Mi&quot;
-            cpu: &quot;350m&quot;
-        ports:
-        - containerPort: 5000
-        env:
-          - name: REGISTRY_AUTH
-            value: &quot;htpasswd&quot;
-          - name: REGISTRY_AUTH_HTPASSWD_PATH
-            value: &quot;/auth/htpasswd&quot;
-          - name: REGISTRY_AUTH_HTPASSWD_REALM
-            value: &quot;Registry Realm&quot;
-          - name: REGISTRY_STORAGE
-            value: &quot;s3&quot;
-          - name: REGISTRY_STORAGE_S3_ACCESSKEY
-            valueFrom:
-              secretKeyRef:
-                name: auth
-                key: access_key
-          - name: REGISTRY_STORAGE_S3_BUCKET
-            value: &quot;test-phoenix-kubernetes&quot;  # REPLACE WITH YOUR OWN
-          - name: REGISTRY_STORAGE_S3_REGION
-            value: &quot;sfo2&quot; # REPLACE WITH YOUR REGION
-          - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
-            value: &quot;sfo2.digitaloceanspaces.com&quot; # REPLACE WITH YOUR REGION ENDPOINT
-          - name: REGISTRY_STORAGE_S3_SECRETKEY
-            valueFrom:
-              secretKeyRef:
-                name: auth
-                key: secret_key
-        volumeMounts:
-          - name: auth
-            mountPath: /auth
-      volumes:
-        - name: auth
-          secret:
-            secretName: auth
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml"><span style="color:#66d9ef">apiVersion</span>: extensions/v1beta1
+<span style="color:#66d9ef">kind</span>: Deployment
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">labels</span>:
+    <span style="color:#66d9ef">app</span>: registry
+  <span style="color:#66d9ef">name</span>: registry
+  <span style="color:#66d9ef">namespace</span>: registry
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">replicas</span>: <span style="color:#ae81ff">1</span>
+  <span style="color:#66d9ef">strategy</span>:
+    <span style="color:#66d9ef">type</span>: RollingUpdate
+  <span style="color:#66d9ef">template</span>:
+    <span style="color:#66d9ef">metadata</span>:
+      <span style="color:#66d9ef">labels</span>:
+        <span style="color:#66d9ef">app</span>: registry
+    <span style="color:#66d9ef">spec</span>:
+      <span style="color:#66d9ef">containers</span>:
+      - <span style="color:#66d9ef">name</span>: registry
+        <span style="color:#66d9ef">image</span>: registry:<span style="color:#ae81ff">2</span>
+        <span style="color:#66d9ef">resources</span>:
+          <span style="color:#66d9ef">requests</span>:
+            <span style="color:#66d9ef">memory</span>: <span style="color:#e6db74">&#34;512Mi&#34;</span>
+            <span style="color:#66d9ef">cpu</span>: <span style="color:#e6db74">&#34;300m&#34;</span>
+          <span style="color:#66d9ef">limits</span>:
+            <span style="color:#66d9ef">memory</span>: <span style="color:#e6db74">&#34;550Mi&#34;</span>
+            <span style="color:#66d9ef">cpu</span>: <span style="color:#e6db74">&#34;350m&#34;</span>
+        <span style="color:#66d9ef">ports</span>:
+        - <span style="color:#66d9ef">containerPort</span>: <span style="color:#ae81ff">5000</span>
+        <span style="color:#66d9ef">env</span>:
+          - <span style="color:#66d9ef">name</span>: REGISTRY_AUTH
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;htpasswd&#34;</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_AUTH_HTPASSWD_PATH
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;/auth/htpasswd&#34;</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_AUTH_HTPASSWD_REALM
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;Registry Realm&#34;</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;s3&#34;</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE_S3_ACCESSKEY
+            <span style="color:#66d9ef">valueFrom</span>:
+              <span style="color:#66d9ef">secretKeyRef</span>:
+                <span style="color:#66d9ef">name</span>: auth
+                <span style="color:#66d9ef">key</span>: access_key
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE_S3_BUCKET
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;test-phoenix-kubernetes&#34;</span>  <span style="color:#75715e"># REPLACE WITH YOUR OWN</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE_S3_REGION
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;sfo2&#34;</span> <span style="color:#75715e"># REPLACE WITH YOUR REGION</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE_S3_REGIONENDPOINT
+            <span style="color:#66d9ef">value</span>: <span style="color:#e6db74">&#34;sfo2.digitaloceanspaces.com&#34;</span> <span style="color:#75715e"># REPLACE WITH YOUR REGION ENDPOINT</span>
+          - <span style="color:#66d9ef">name</span>: REGISTRY_STORAGE_S3_SECRETKEY
+            <span style="color:#66d9ef">valueFrom</span>:
+              <span style="color:#66d9ef">secretKeyRef</span>:
+                <span style="color:#66d9ef">name</span>: auth
+                <span style="color:#66d9ef">key</span>: secret_key
+        <span style="color:#66d9ef">volumeMounts</span>:
+          - <span style="color:#66d9ef">name</span>: auth
+            <span style="color:#66d9ef">mountPath</span>: /auth
+      <span style="color:#66d9ef">volumes</span>:
+        - <span style="color:#66d9ef">name</span>: auth
+          <span style="color:#66d9ef">secret</span>:
+            <span style="color:#66d9ef">secretName</span>: auth
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: registry
-  namespace: registry
-spec:
-  selector:
-    app: registry
-  ports:
-  - name: &quot;5000&quot;
-    port: 5000
-    targetPort: 5000
+<span style="color:#66d9ef">apiVersion</span>: v1
+<span style="color:#66d9ef">kind</span>: Service
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: registry
+  <span style="color:#66d9ef">namespace</span>: registry
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">selector</span>:
+    <span style="color:#66d9ef">app</span>: registry
+  <span style="color:#66d9ef">ports</span>:
+  - <span style="color:#66d9ef">name</span>: <span style="color:#e6db74">&#34;5000&#34;</span>
+    <span style="color:#66d9ef">port</span>: <span style="color:#ae81ff">5000</span>
+    <span style="color:#66d9ef">targetPort</span>: <span style="color:#ae81ff">5000</span>
 ---
-apiVersion: extensions/v1beta1
-kind: Ingress
-metadata:
-  name: registry-ingress
-  namespace: registry
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-body-size: &quot;0&quot;
-    nginx.ingress.kubernetes.io/proxy-request-buffering: &quot;off&quot;
-    certmanager.k8s.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - registry1234.mooo.com # REPLACE
-    secretName: letsencrypt-prod
-  rules:
-  - host: registry1234.mooo.com # REPLACE
-    http:
-      paths:
-      - backend:
-          serviceName: registry
-          servicePort: 5000
-</code></pre>
-
-<p>Replace the values where there is a # REPLACE comment with values from your registry.</p>
-
+<span style="color:#66d9ef">apiVersion</span>: extensions/v1beta1
+<span style="color:#66d9ef">kind</span>: Ingress
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: registry-ingress
+  <span style="color:#66d9ef">namespace</span>: registry
+  <span style="color:#66d9ef">annotations</span>:
+    <span style="color:#66d9ef">kubernetes.io/ingress.class</span>: nginx
+    <span style="color:#66d9ef">nginx.ingress.kubernetes.io/proxy-body-size</span>: <span style="color:#e6db74">&#34;0&#34;</span>
+    <span style="color:#66d9ef">nginx.ingress.kubernetes.io/proxy-request-buffering</span>: <span style="color:#e6db74">&#34;off&#34;</span>
+    <span style="color:#66d9ef">certmanager.k8s.io/cluster-issuer</span>: letsencrypt-prod
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">tls</span>:
+  - <span style="color:#66d9ef">hosts</span>:
+    - registry1234.mooo.com <span style="color:#75715e"># REPLACE</span>
+    <span style="color:#66d9ef">secretName</span>: letsencrypt-prod
+  <span style="color:#66d9ef">rules</span>:
+  - <span style="color:#66d9ef">host</span>: registry1234.mooo.com <span style="color:#75715e"># REPLACE</span>
+    <span style="color:#66d9ef">http</span>:
+      <span style="color:#66d9ef">paths</span>:
+      - <span style="color:#66d9ef">backend</span>:
+          <span style="color:#66d9ef">serviceName</span>: registry
+          <span style="color:#66d9ef">servicePort</span>: <span style="color:#ae81ff">5000</span>
+</code></pre></div><p>Replace the values where there is a # REPLACE comment with values from your registry.</p>
 <p>Ensure that the DNS entry you&rsquo;ve created in the above section resolves to your EXTERNAL-IP with <code>dig HOSTNAME</code>. If this does not, wait until DNS propagation finishes (which can take a while), and then continue. Part of the next step is certificate issuing by let&rsquo;s encrypt, which needs to reach your kubernetes cluster via the hostname.</p>
-
 <p>Run <code>kubectl apply -f registry.yaml</code> with the changes you have made.</p>
-
 <p>After a minute or two, run <code>kubectl get pods -n registry</code> which should result in something similar to:</p>
-
-<pre><code class="language-text">NAME                        READY   STATUS    RESTARTS   AGE
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME                        READY   STATUS    RESTARTS   AGE
 registry-dfd5d4c94-7kc2m    1/1     Running   0          14s
-</code></pre>
-
-<p>If you see something like <code>cm-acme-http-solver</code>, that&rsquo;s fine! Wait a few minutes and run the same command, it shouldn&rsquo;t be there anymore.</p>
-
+</code></pre></div><p>If you see something like <code>cm-acme-http-solver</code>, that&rsquo;s fine! Wait a few minutes and run the same command, it shouldn&rsquo;t be there anymore.</p>
 <p>To verify that your registry is working, run:</p>
-
-<pre><code class="language-shell">docker login YOUR_REGISTRY_HOSTNAME # login with the username and password you created in the htpasswd command
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">docker login YOUR_REGISTRY_HOSTNAME <span style="color:#75715e"># login with the username and password you created in the htpasswd command</span>
 docker pull elixir:1.9
 docker tag elixir:1.9 YOUR_REGISTRY_HOSTNAME/admin/elixir:1.9
 docker push YOUR_REGISTRY_HOSTNAME/admin/elixir:1.9
-</code></pre>
-
-<h2 id="a-brief-note-about-troubleshooting">A Brief Note about Troubleshooting</h2>
-
+</code></pre></div><h2 id="a-brief-note-about-troubleshooting">A Brief Note about Troubleshooting</h2>
 <p>If things are not working at any point, my go to debugging commands are: <code>kubectl get pods</code>, <code>kubectl logs POD-ID</code>, <code>kubectl describe pod POD-ID</code>, and those should hopefully give you enough output to begin searching for a fix.</p>
-
 <h2 id="creating-a-managed-database">Creating a Managed Database</h2>
-
 <p>Our Phoenix Application is going to be backed by a managed Postgres instance. <a href="https://cloud.digitalocean.com/databases/new">Navigate here</a> to create one. Pick a $15/month instance in the data center nearest you. It should take a few minutes to be provisioned.</p>
-
 <p>When it&rsquo;s done being created, add a user by clicking the &ldquo;Users &amp; Databases&rdquo; tab. It will auto generate a password for you. In my case, my user is <code>phoenix_test_project</code>. Record the auto-generated password somewhere. In a production system, you&rsquo;d want to create this user via the <code>psql</code> client, to be able to have fine control over their role&rsquo;s ability.</p>
-
 <p>Create a database via the UI on the same page called <code>phoenix_test_project</code> as well.</p>
-
 <p>Finally, go to the Settings tab, and add your Kubernetes cluster and your computer&rsquo;s IP address to the trusted sources section.</p>
-
 <p>Note: It&rsquo;s possible to deploy Postgres yourself on Kubernetes to save costs; I have not done this though, and prefer paying to not worry about managing it properly.</p>
-
 <h2 id="creating-a-phoenix-app">Creating a Phoenix App</h2>
-
 <p>It&rsquo;s finally time to create your Phoenix application! If you need help installing Phoenix and Elixir, <a href="https://hexdocs.pm/phoenix/installation.html#content">follow this guide</a>. Create your phoenix application with <code>mix phx.new kubernetes_phoenix</code> and <code>cd</code> into that directory.</p>
-
 <p>We&rsquo;re going to be using <a href="https://hexdocs.pm/mix/Mix.Tasks.Release.html">Elixir 1.9 releases</a> for this. The <a href="https://hexdocs.pm/phoenix/releases.html">Phoenix documentation</a> is very comprehensive, so turn to that if you want to dive deeper. Run <code>mix release.init</code> to generate some release helpers.</p>
-
 <p>As mentioned in the <a href="https://hexdocs.pm/phoenix/releases.html">phoenix documentation</a>, add this file at <code>lib/release.ex</code> to deal with migrations:</p>
-
-<pre><code class="language-elixir">defmodule KubernetesPhoenix.Release do
-  @app :kubernetes_phoenix
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-elixir" data-lang="elixir">defmodule <span style="color:#a6e22e">KubernetesPhoenix.Release</span> do
+  <span style="color:#a6e22e">@app</span> <span style="color:#e6db74">:kubernetes_phoenix</span>
 
   def migrate do
-    for repo &lt;- repos() do
-      {:ok, _, _} = Ecto.Migrator.with_repo(repo, &amp;Ecto.Migrator.run(&amp;1, :up, all: true))
+    for repo <span style="color:#f92672">&lt;-</span> repos() do
+      {<span style="color:#e6db74">:ok</span>, _, _} <span style="color:#f92672">=</span> <span style="color:#a6e22e">Ecto.Migrator</span><span style="color:#f92672">.</span>with_repo(repo, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Ecto.Migrator</span><span style="color:#f92672">.</span>run(&amp;1, <span style="color:#e6db74">:up</span>, <span style="color:#e6db74">all</span>: true))
     end
   end
 
   def rollback(repo, version) do
-    {:ok, _, _} = Ecto.Migrator.with_repo(repo, &amp;Ecto.Migrator.run(&amp;1, :down, to: version))
+    {<span style="color:#e6db74">:ok</span>, _, _} <span style="color:#f92672">=</span> <span style="color:#a6e22e">Ecto.Migrator</span><span style="color:#f92672">.</span>with_repo(repo, <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">Ecto.Migrator</span><span style="color:#f92672">.</span>run(&amp;1, <span style="color:#e6db74">:down</span>, <span style="color:#e6db74">to</span>: version))
   end
 
   defp repos do
-    Application.load(@app)
-    {:ok, _} = Application.ensure_all_started(@app) # This is not in the phoenix documentation, but it's necessary to ensure :ssl is started
-    Application.fetch_env!(@app, :ecto_repos)
+    <span style="color:#a6e22e">Application</span><span style="color:#f92672">.</span>load(<span style="color:#a6e22e">@app</span>)
+    {<span style="color:#e6db74">:ok</span>, _} <span style="color:#f92672">=</span> <span style="color:#a6e22e">Application</span><span style="color:#f92672">.</span>ensure_all_started(<span style="color:#a6e22e">@app</span>) <span style="color:#75715e"># This is not in the phoenix documentation, but it&#39;s necessary to ensure :ssl is started</span>
+    <span style="color:#a6e22e">Application</span><span style="color:#f92672">.</span>fetch_env!(<span style="color:#a6e22e">@app</span>, <span style="color:#e6db74">:ecto_repos</span>)
   end
 end
-</code></pre>
-
-<p>Also per the Phoenix documentation:</p>
-
+</code></pre></div><p>Also per the Phoenix documentation:</p>
 <ul>
 <li>Rename config/prod.secret.exs to config/releases.exs: <code>mv config/prod.secret.exs config/releases.exs</code></li>
 <li>In config/releases.exs, change <code>use Mix.Config</code> to <code>import Config</code></li>
@@ -1482,239 +1394,202 @@ end
 <li>Uncomment <code>ssl: true,</code> from <code>releases.exs</code> for the Repo config.</li>
 <li>Add <code>:ssl</code> to the list of <code>extra_applications</code> in your <code>mix.exs</code> file, like this: <code>extra_applications: [:logger, :runtime_tools, :ssl]</code>. This is to ensure Ecto can talk to Postgres over SSL.</li>
 <li>Change &ldquo;example.com&rdquo; in <code>prod.exs</code> to the DNS name you chose earlier. Mine looks like <code>url: [host: &quot;phoenix1234.mooo.com&quot;, port: 80],</code>
-
 <ul>
 <li>Don&rsquo;t worry about the port: 80 in this section. We are using NGINX and Cert-Manager to ensure traffic is encrypted via TLS.</li>
-</ul></li>
 </ul>
-
+</li>
+</ul>
 <h2 id="secret-configurations">Secret Configurations</h2>
-
 <p>Let&rsquo;s create a Kubernetes namespace and generate some secrets our application will need:</p>
-
-<pre><code class="language-bash">kubectl create namespace phoenix
-mix phx.gen.secret | tr -d &quot;\n&quot; &gt; secret_key_base # New lines are the worst.
-echo -n &quot;ecto://USERNAME:PASSWORD@HOSTNAME:PORT/DATABASE&quot; &gt; postgres_url
-# for example, mine was echo -n &quot;ecto://phoenix_test_project:really_secure_password@private-test-phoenix-cluster-do-user-6447302-0.db.ondigitalocean.com:25060/phoenix_test_project&quot; &gt; postgres_url
-kubectl create secret --namespace phoenix generic phoenix-secrets --from-file=./secret_key_base --from-file=./postgres_url
-</code></pre>
-
-<p>We need to create a secret that allows Kubernetes to pull from our private registry. The following is from <a href="https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-secret-by-providing-credentials-on-the-command-line">the kubernetes docs</a>. Fill out the values for your private docker registry.</p>
-
-<pre><code class="language-bash">kubectl create secret --namespace phoenix docker-registry regcred --docker-server=&lt;your-registry-server&gt; --docker-username=&lt;your-name&gt; --docker-password=&lt;your-pword&gt; --docker-email=&lt;your-email&gt;
-</code></pre>
-
-<h2 id="creating-and-pushing-a-docker-image">Creating and Pushing a Docker Image</h2>
-
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl create namespace phoenix
+mix phx.gen.secret | tr -d <span style="color:#e6db74">&#34;\n&#34;</span> &gt; secret_key_base <span style="color:#75715e"># New lines are the worst.</span>
+echo -n <span style="color:#e6db74">&#34;ecto://USERNAME:PASSWORD@HOSTNAME:PORT/DATABASE&#34;</span> &gt; postgres_url
+<span style="color:#75715e"># for example, mine was echo -n &#34;ecto://phoenix_test_project:really_secure_password@private-test-phoenix-cluster-do-user-6447302-0.db.ondigitalocean.com:25060/phoenix_test_project&#34; &gt; postgres_url</span>
+kubectl create secret --namespace phoenix generic phoenix-secrets --from-file<span style="color:#f92672">=</span>./secret_key_base --from-file<span style="color:#f92672">=</span>./postgres_url
+</code></pre></div><p>We need to create a secret that allows Kubernetes to pull from our private registry. The following is from <a href="https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/#create-a-secret-by-providing-credentials-on-the-command-line">the kubernetes docs</a>. Fill out the values for your private docker registry.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">kubectl create secret --namespace phoenix docker-registry regcred --docker-server<span style="color:#f92672">=</span>&lt;your-registry-server&gt; --docker-username<span style="color:#f92672">=</span>&lt;your-name&gt; --docker-password<span style="color:#f92672">=</span>&lt;your-pword&gt; --docker-email<span style="color:#f92672">=</span>&lt;your-email&gt;
+</code></pre></div><h2 id="creating-and-pushing-a-docker-image">Creating and Pushing a Docker Image</h2>
 <p>Add this Dockerfile to your application. (Taken from the <a href="https://hexdocs.pm/phoenix/releases.html">Phoenix Docs</a>)</p>
-
-<pre><code class="language-docker">FROM elixir:1.9.0-alpine as build
-RUN apk add --update build-base git npm
-RUN mkdir /app
-WORKDIR /app
-RUN mix local.hex --force &amp;&amp; \
-    mix local.rebar --force
-ENV MIX_ENV=prod
-COPY mix.exs mix.lock ./
-COPY config config
-RUN mix deps.get
-RUN mix deps.compile
-COPY assets assets
-RUN cd assets &amp;&amp; npm install &amp;&amp; npm run deploy
-RUN mix phx.digest
-COPY priv priv
-COPY lib lib
-RUN mix compile
-COPY rel rel
-RUN mix release
-
-FROM alpine:3.9 AS app
-RUN apk add --update bash openssl
-RUN mkdir /app
-WORKDIR /app
-COPY --from=build /app/_build/prod/rel/kubernetes_phoenix ./
-RUN chown -R nobody: /app
-USER nobody
-ENV HOME=/app
-CMD [&quot;bin/kubernetes_phoenix&quot;, &quot;start&quot;]
-</code></pre>
-
-<p>Run the following, substituting <code>registry1234.mooo.com</code> with your private container registry:</p>
-
-<pre><code class="language-bash">docker build . -t registry1234.mooo.com/admin/kubernetes_phoenix:latest
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-docker" data-lang="docker"><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> elixir:1.9.0-alpine as build</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> apk add --update build-base git npm<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mkdir /app<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">WORKDIR</span><span style="color:#e6db74"> /app</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix local.hex --force <span style="color:#f92672">&amp;&amp;</span> <span style="color:#ae81ff">\
+</span><span style="color:#ae81ff"></span>    mix local.rebar --force<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">ENV</span> MIX_ENV<span style="color:#f92672">=</span>prod
+<span style="color:#66d9ef">COPY</span> mix.exs mix.lock ./<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> config config<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix deps.get<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix deps.compile<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> assets assets<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> cd assets <span style="color:#f92672">&amp;&amp;</span> npm install <span style="color:#f92672">&amp;&amp;</span> npm run deploy<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix phx.digest<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> priv priv<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> lib lib<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix compile<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> rel rel<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mix release<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">FROM</span><span style="color:#e6db74"> alpine:3.9 AS app</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> apk add --update bash openssl<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> mkdir /app<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">WORKDIR</span><span style="color:#e6db74"> /app</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">COPY</span> --from<span style="color:#f92672">=</span>build /app/_build/prod/rel/kubernetes_phoenix ./<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">RUN</span> chown -R nobody: /app<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">USER</span><span style="color:#e6db74"> nobody</span><span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">ENV</span> HOME<span style="color:#f92672">=</span>/app<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span><span style="color:#66d9ef">CMD</span> [<span style="color:#e6db74">&#34;bin/kubernetes_phoenix&#34;</span>, <span style="color:#e6db74">&#34;start&#34;</span>]<span style="color:#960050;background-color:#1e0010">
+</span></code></pre></div><p>Run the following, substituting <code>registry1234.mooo.com</code> with your private container registry:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">docker build . -t registry1234.mooo.com/admin/kubernetes_phoenix:latest
 docker push registry1234.mooo.com/admin/kubernetes_phoenix:latest
-</code></pre>
-
-<h2 id="database-migrations">Database Migrations</h2>
-
+</code></pre></div><h2 id="database-migrations">Database Migrations</h2>
 <p>Our database migrations will be done with Kubernetes jobs. Create a migrate_job.yaml with the following:</p>
-
-<pre><code class="language-yaml">apiVersion: batch/v1
-kind: Job
-metadata:
-  name: migrate-job-latest
-  namespace: phoenix
-spec:
-  template:
-    spec:
-      containers:
-        - name: migrate-latest
-          image: registry1234.mooo.com/admin/kubernetes_phoenix:latest # use your own registry
-          command:
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml"><span style="color:#66d9ef">apiVersion</span>: batch/v1
+<span style="color:#66d9ef">kind</span>: Job
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: migrate-job-latest
+  <span style="color:#66d9ef">namespace</span>: phoenix
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">template</span>:
+    <span style="color:#66d9ef">spec</span>:
+      <span style="color:#66d9ef">containers</span>:
+        - <span style="color:#66d9ef">name</span>: migrate-latest
+          <span style="color:#66d9ef">image</span>: registry1234.mooo.com/admin/kubernetes_phoenix:latest <span style="color:#75715e"># use your own registry</span>
+          <span style="color:#66d9ef">command</span>:
             [
-              &quot;bin/kubernetes_phoenix&quot;,
-              &quot;eval&quot;,
-              &quot;KubernetesPhoenix.Release.migrate&quot;,
+              <span style="color:#e6db74">&#34;bin/kubernetes_phoenix&#34;</span>,
+              <span style="color:#e6db74">&#34;eval&#34;</span>,
+              <span style="color:#e6db74">&#34;KubernetesPhoenix.Release.migrate&#34;</span>,
             ]
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: phoenix-secrets
-                  key: postgres_url
-            - name: SECRET_KEY_BASE
-              valueFrom:
-                secretKeyRef:
-                  name: phoenix-secrets
-                  key: secret_key_base
-      imagePullSecrets:
-        - name: regcred
-      restartPolicy: Never
-</code></pre>
-
-<p>Replace the <code>image</code> value with your own image, and then run the migrations with: <code>kubectl apply -f migrate_job.yaml</code>. Then, run <code>kubectl get pods -n phoenix</code>. If all went well, you&rsquo;ll get output similar to:</p>
-
-<pre><code class="language-bash">$ kubectl get pods -n phoenix
+          <span style="color:#66d9ef">env</span>:
+            - <span style="color:#66d9ef">name</span>: DATABASE_URL
+              <span style="color:#66d9ef">valueFrom</span>:
+                <span style="color:#66d9ef">secretKeyRef</span>:
+                  <span style="color:#66d9ef">name</span>: phoenix-secrets
+                  <span style="color:#66d9ef">key</span>: postgres_url
+            - <span style="color:#66d9ef">name</span>: SECRET_KEY_BASE
+              <span style="color:#66d9ef">valueFrom</span>:
+                <span style="color:#66d9ef">secretKeyRef</span>:
+                  <span style="color:#66d9ef">name</span>: phoenix-secrets
+                  <span style="color:#66d9ef">key</span>: secret_key_base
+      <span style="color:#66d9ef">imagePullSecrets</span>:
+        - <span style="color:#66d9ef">name</span>: regcred
+      <span style="color:#66d9ef">restartPolicy</span>: Never
+</code></pre></div><p>Replace the <code>image</code> value with your own image, and then run the migrations with: <code>kubectl apply -f migrate_job.yaml</code>. Then, run <code>kubectl get pods -n phoenix</code>. If all went well, you&rsquo;ll get output similar to:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl get pods -n phoenix
 NAME                       READY   STATUS      RESTARTS   AGE
-migrate-job-latest-vgh6z   0/1     Completed   0          97s
-</code></pre>
-
-<p>You can check the logs by using <code>kubectl logs -n phoenix POD-name</code>, like:</p>
-
-<pre><code class="language-bash">$ kubectl logs -n phoenix migrate-job-latest-vgh6z
-21:00:47.312 [info] Running KubernetesPhoenixWeb.Endpoint with cowboy 2.6.3 at :::4000 (http)
-21:00:47.324 [info] Access KubernetesPhoenixWeb.Endpoint at http://phoenix1234.mooo.com
-21:00:47.683 [info] Already up
-</code></pre>
-
-<p>Delete the job after it completes: <code>kubectl delete -f migrate_job.yaml</code></p>
-
+migrate-job-latest-vgh6z   0/1     Completed   <span style="color:#ae81ff">0</span>          97s
+</code></pre></div><p>You can check the logs by using <code>kubectl logs -n phoenix POD-name</code>, like:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">$ kubectl logs -n phoenix migrate-job-latest-vgh6z
+21:00:47.312 <span style="color:#f92672">[</span>info<span style="color:#f92672">]</span> Running KubernetesPhoenixWeb.Endpoint with cowboy 2.6.3 at :::4000 <span style="color:#f92672">(</span>http<span style="color:#f92672">)</span>
+21:00:47.324 <span style="color:#f92672">[</span>info<span style="color:#f92672">]</span> Access KubernetesPhoenixWeb.Endpoint at http://phoenix1234.mooo.com
+21:00:47.683 <span style="color:#f92672">[</span>info<span style="color:#f92672">]</span> Already up
+</code></pre></div><p>Delete the job after it completes: <code>kubectl delete -f migrate_job.yaml</code></p>
 <h2 id="running-the-application">Running the Application</h2>
-
 <p>Create an <code>application.yaml</code> that has the following:</p>
-
-<pre><code class="language-yaml">---
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: phoenix
-  namespace: phoenix
-spec:
-  selector:
-    matchLabels:
-      app: phoenix
-  replicas: 2
-  strategy:
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 2
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app: phoenix
-    spec:
-      containers:
-        - name: phoenix
-          image: registry1234.mooo.com/admin/kubernetes_phoenix:latest # use your own registry
-          resources:
-            requests:
-              memory: &quot;512Mi&quot;
-              cpu: &quot;300m&quot;
-            limits:
-              memory: &quot;550Mi&quot;
-              cpu: &quot;350m&quot;
-          ports:
-            - containerPort: 4000
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 4000
-            initialDelaySeconds: 45
-            successThreshold: 1
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 4000
-            initialDelaySeconds: 0
-            successThreshold: 1
-            failureThreshold: 3
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: phoenix-secrets
-                  key: postgres_url
-            - name: SECRET_KEY_BASE
-              valueFrom:
-                secretKeyRef:
-                  name: phoenix-secrets
-                  key: secret_key_base
-      imagePullSecrets:
-        - name: regcred
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml">---
+<span style="color:#66d9ef">apiVersion</span>: extensions/v1beta1
+<span style="color:#66d9ef">kind</span>: Deployment
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: phoenix
+  <span style="color:#66d9ef">namespace</span>: phoenix
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">selector</span>:
+    <span style="color:#66d9ef">matchLabels</span>:
+      <span style="color:#66d9ef">app</span>: phoenix
+  <span style="color:#66d9ef">replicas</span>: <span style="color:#ae81ff">2</span>
+  <span style="color:#66d9ef">strategy</span>:
+    <span style="color:#66d9ef">rollingUpdate</span>:
+      <span style="color:#66d9ef">maxUnavailable</span>: <span style="color:#ae81ff">1</span>
+      <span style="color:#66d9ef">maxSurge</span>: <span style="color:#ae81ff">2</span>
+    <span style="color:#66d9ef">type</span>: RollingUpdate
+  <span style="color:#66d9ef">template</span>:
+    <span style="color:#66d9ef">metadata</span>:
+      <span style="color:#66d9ef">labels</span>:
+        <span style="color:#66d9ef">app</span>: phoenix
+    <span style="color:#66d9ef">spec</span>:
+      <span style="color:#66d9ef">containers</span>:
+        - <span style="color:#66d9ef">name</span>: phoenix
+          <span style="color:#66d9ef">image</span>: registry1234.mooo.com/admin/kubernetes_phoenix:latest <span style="color:#75715e"># use your own registry</span>
+          <span style="color:#66d9ef">resources</span>:
+            <span style="color:#66d9ef">requests</span>:
+              <span style="color:#66d9ef">memory</span>: <span style="color:#e6db74">&#34;512Mi&#34;</span>
+              <span style="color:#66d9ef">cpu</span>: <span style="color:#e6db74">&#34;300m&#34;</span>
+            <span style="color:#66d9ef">limits</span>:
+              <span style="color:#66d9ef">memory</span>: <span style="color:#e6db74">&#34;550Mi&#34;</span>
+              <span style="color:#66d9ef">cpu</span>: <span style="color:#e6db74">&#34;350m&#34;</span>
+          <span style="color:#66d9ef">ports</span>:
+            - <span style="color:#66d9ef">containerPort</span>: <span style="color:#ae81ff">4000</span>
+          <span style="color:#66d9ef">livenessProbe</span>:
+            <span style="color:#66d9ef">httpGet</span>:
+              <span style="color:#66d9ef">path</span>: /
+              <span style="color:#66d9ef">port</span>: <span style="color:#ae81ff">4000</span>
+            <span style="color:#66d9ef">initialDelaySeconds</span>: <span style="color:#ae81ff">45</span>
+            <span style="color:#66d9ef">successThreshold</span>: <span style="color:#ae81ff">1</span>
+            <span style="color:#66d9ef">failureThreshold</span>: <span style="color:#ae81ff">3</span>
+          <span style="color:#66d9ef">readinessProbe</span>:
+            <span style="color:#66d9ef">httpGet</span>:
+              <span style="color:#66d9ef">path</span>: /
+              <span style="color:#66d9ef">port</span>: <span style="color:#ae81ff">4000</span>
+            <span style="color:#66d9ef">initialDelaySeconds</span>: <span style="color:#ae81ff">0</span>
+            <span style="color:#66d9ef">successThreshold</span>: <span style="color:#ae81ff">1</span>
+            <span style="color:#66d9ef">failureThreshold</span>: <span style="color:#ae81ff">3</span>
+          <span style="color:#66d9ef">env</span>:
+            - <span style="color:#66d9ef">name</span>: DATABASE_URL
+              <span style="color:#66d9ef">valueFrom</span>:
+                <span style="color:#66d9ef">secretKeyRef</span>:
+                  <span style="color:#66d9ef">name</span>: phoenix-secrets
+                  <span style="color:#66d9ef">key</span>: postgres_url
+            - <span style="color:#66d9ef">name</span>: SECRET_KEY_BASE
+              <span style="color:#66d9ef">valueFrom</span>:
+                <span style="color:#66d9ef">secretKeyRef</span>:
+                  <span style="color:#66d9ef">name</span>: phoenix-secrets
+                  <span style="color:#66d9ef">key</span>: secret_key_base
+      <span style="color:#66d9ef">imagePullSecrets</span>:
+        - <span style="color:#66d9ef">name</span>: regcred
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: phoenix-service
-  namespace: phoenix
-spec:
-  selector:
-    app: phoenix
-  ports:
-    - protocol: TCP
-      port: 4000
-      name: web
+<span style="color:#66d9ef">apiVersion</span>: v1
+<span style="color:#66d9ef">kind</span>: Service
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: phoenix-service
+  <span style="color:#66d9ef">namespace</span>: phoenix
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">selector</span>:
+    <span style="color:#66d9ef">app</span>: phoenix
+  <span style="color:#66d9ef">ports</span>:
+    - <span style="color:#66d9ef">protocol</span>: TCP
+      <span style="color:#66d9ef">port</span>: <span style="color:#ae81ff">4000</span>
+      <span style="color:#66d9ef">name</span>: web
 ---
-apiVersion: extensions/v1beta1
-kind: Ingress
-metadata:
-  name: phoenix-ingress
-  namespace: phoenix
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    certmanager.k8s.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-    - hosts:
-        - phoenix1234.mooo.com  # Use your own hostname
-      secretName: letsencrypt-prod
-  rules:
-    - host: phoenix1234.mooo.com # Use your own hostname
-      http:
-        paths:
-          - backend:
-              serviceName: phoenix-service
-              servicePort: 4000
+<span style="color:#66d9ef">apiVersion</span>: extensions/v1beta1
+<span style="color:#66d9ef">kind</span>: Ingress
+<span style="color:#66d9ef">metadata</span>:
+  <span style="color:#66d9ef">name</span>: phoenix-ingress
+  <span style="color:#66d9ef">namespace</span>: phoenix
+  <span style="color:#66d9ef">annotations</span>:
+    <span style="color:#66d9ef">kubernetes.io/ingress.class</span>: nginx
+    <span style="color:#66d9ef">certmanager.k8s.io/cluster-issuer</span>: letsencrypt-prod
+<span style="color:#66d9ef">spec</span>:
+  <span style="color:#66d9ef">tls</span>:
+    - <span style="color:#66d9ef">hosts</span>:
+        - phoenix1234.mooo.com  <span style="color:#75715e"># Use your own hostname</span>
+      <span style="color:#66d9ef">secretName</span>: letsencrypt-prod
+  <span style="color:#66d9ef">rules</span>:
+    - <span style="color:#66d9ef">host</span>: phoenix1234.mooo.com <span style="color:#75715e"># Use your own hostname</span>
+      <span style="color:#66d9ef">http</span>:
+        <span style="color:#66d9ef">paths</span>:
+          - <span style="color:#66d9ef">backend</span>:
+              <span style="color:#66d9ef">serviceName</span>: phoenix-service
+              <span style="color:#66d9ef">servicePort</span>: <span style="color:#ae81ff">4000</span>
 
-</code></pre>
-
-<p>Replace the <code>image</code> value with your image, and replace the hosts with the DNS entry you&rsquo;ve obtained. Deploy the application with: <code>kubectl apply -f application.yaml</code>. Then, run <code>kubectl get pods -n phoenix</code>. If all went well, you&rsquo;ll have output that looks like this after a minute or two:</p>
-
-<pre><code class="language-text">NAME                      READY   STATUS    RESTARTS   AGE
+</code></pre></div><p>Replace the <code>image</code> value with your image, and replace the hosts with the DNS entry you&rsquo;ve obtained. Deploy the application with: <code>kubectl apply -f application.yaml</code>. Then, run <code>kubectl get pods -n phoenix</code>. If all went well, you&rsquo;ll have output that looks like this after a minute or two:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME                      READY   STATUS    RESTARTS   AGE
 phoenix-679fbdbd5-4ws6q   1/1     Running   0          1m18s
 phoenix-679fbdbd5-5cwhz   1/1     Running   0          1m18s
-</code></pre>
-
-<p>Your website should now be available at the dns address you&rsquo;ve picked! In my case, it was available at <code>https://phoenix1234.mooo.com</code> (It is not there anymore.)</p>
-
+</code></pre></div><p>Your website should now be available at the dns address you&rsquo;ve picked! In my case, it was available at <code>https://phoenix1234.mooo.com</code> (It is not there anymore.)</p>
 <h2 id="next-steps">Next Steps</h2>
-
 <p>Hopefully things went smoothly for you! Please leave a comment if they did not! Remember to delete all your unused resources when you are done!</p>
-
 <p>There are a lot of exciting things you can do with your newly deployed application. Some ideas are:</p>
-
 <ul>
 <li><a href="https://www.digitalocean.com/docs/kubernetes/how-to/monitor-advanced/">Use Digital Ocean&rsquo;s Advanced Metrics</a></li>
 <li><a href="https://linkerd.io/">Install Linkerd</a></li>
@@ -1780,6 +1655,8 @@ phoenix-679fbdbd5-5cwhz   1/1     Running   0          1m18s
             </div>
         
 
+        
+
         <div class="copyright">
 
         
@@ -1790,6 +1667,8 @@ phoenix-679fbdbd5-5cwhz   1/1     Running   0          1m18s
 
         </div>
         <div class="icons">
+
+        
 
         
 
